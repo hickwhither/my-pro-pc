@@ -9,6 +9,7 @@ A lightweight Roblox mod loader for local client-side utility mods.
 - `Fly` (`F8`) - enables camera-aligned flight movement.
 - `Destroy` (`F9`) - emergency off switch that disables the other loaded mods.
 - `AnglerSafety` (`F10`/`F11`) - watches Angler-class entities with ESP and optional height-based safe mode teleport.
+- `ItemEsp` (`F12`/`J`/`K`) - highlights keycards and password papers, auto-picks visible keycards/papers, and can extend proximity prompt range for items plus generators.
 
 If you want full fly noclip, enable both `Fly` and `Noclip` together.
 
