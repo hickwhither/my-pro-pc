@@ -137,6 +137,7 @@ local modModules = {
     "mods/Noclip.lua",
     "mods/Fly.lua",
     "mods/AnglerSafety.lua",
+    "mods/ItemEsp.lua",
 }
 
 local function syncMods(settings)
