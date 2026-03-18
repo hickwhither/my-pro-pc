@@ -2,7 +2,7 @@ local Fullbright = _G.offlineservice("Fullbright")
 
 local Lighting = game:GetService("Lighting")
 
-Fullbright.defaultKeybind = "F6"
+local ENABLED_KEY = "fullbrightEnabled"
 
 local originalLighting
 local propertyConnections = {}
@@ -58,25 +58,44 @@ local function connectPropertyLocks()
     end
 end
 
-function Fullbright.toggle(enabled)
-    if enabled then
-        saveOriginalLighting()
-        applyFullbright()
-        connectPropertyLocks()
-    else
-        disconnectPropertyConnections()
-
-        if originalLighting then
-            Lighting.Brightness = originalLighting.Brightness
-            Lighting.ClockTime = originalLighting.ClockTime
-            Lighting.FogEnd = originalLighting.FogEnd
-            Lighting.GlobalShadows = originalLighting.GlobalShadows
-            Lighting.Ambient = originalLighting.Ambient
-            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-            originalLighting = nil
-        end
-    end
-
-    _G.updateSettings("fullbrightEnabled", enabled)
+function Fullbright:enable()
+    saveOriginalLighting()
+    applyFullbright()
+    connectPropertyLocks()
 end
 
+function Fullbright:disable()
+    disconnectPropertyConnections()
+
+    if originalLighting then
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.GlobalShadows = originalLighting.GlobalShadows
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        originalLighting = nil
+    end
+end
+
+function Fullbright:kill()
+    self:disable()
+    self:setState(ENABLED_KEY, false)
+    _G.updateSettings(ENABLED_KEY, false)
+end
+
+Fullbright:registerToggle({
+    id = "FullbrightToggle",
+    settingKey = ENABLED_KEY,
+    keybindKey = "fullbrightKeybind",
+    defaultKeybind = "F6",
+    onToggle = function(enabled)
+        if enabled then
+            Fullbright:enable()
+        else
+            Fullbright:disable()
+        end
+    end,
+})
+
+return Fullbright
