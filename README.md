@@ -26,22 +26,13 @@ Basic pattern:
 
 1. Create a service with `_G.offlineservice("YourModName")`.
 2. Create setting keys for enabled state + keybind.
-3. Read defaults with `_G.getSetting(...)` during startup.
-4. Implement `toggle(enabled)` to apply and clean up the feature.
-5. Listen for keyboard input with `UserInputService`.
-6. Return the service object.
+3. Implement `toggle(enabled)` to apply and clean up the feature.
 
 ## Simple mod template
 
 ```lua
 local Example = _G.offlineservice("Example")
-
-local UserInputService = game:GetService("UserInputService")
-
-local ENABLED_KEY = "exampleEnabled"
-local KEYBIND_KEY = "exampleKeybind"
-local DEFAULT_KEYBIND = "K"
-local inputConnection
+Noclip.defaultKeybind = "K"
 
 local function keyCodeFromSetting(value)
     if typeof(value) ~= "string" then
@@ -55,36 +46,13 @@ function Example.toggle(enabled)
     print("Example enabled:", enabled)
     _G.updateSettings(ENABLED_KEY, enabled)
 end
-
-local function bindInput()
-    if inputConnection then
-        return
-    end
-
-    inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then
-            return
-        end
-
-        local keyCode = keyCodeFromSetting(_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND))
-        if keyCode and input.KeyCode == keyCode then
-            Example.toggle(not _G.getSetting(ENABLED_KEY, false))
-        end
-    end)
-end
-
-_G.getSetting(ENABLED_KEY, false)
-_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND)
-bindInput()
-
-return Example
 ```
 
 ## Adding a new mod
 
 1. Create `src/mods/YourMod.lua`.
 2. Follow the template above.
-3. Add the file path to the `mods` table in `src/main.lua`.
+3. Add the file path to the `modDefinitions` table in `src/main.lua`.
 4. Reload the loader/debug server so the new file is fetched.
 
 ## Notes for mod authors

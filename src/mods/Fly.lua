@@ -246,4 +246,3 @@ end
 
 bindMovementInput()
 
-return Fly

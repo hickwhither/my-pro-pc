@@ -47,4 +47,3 @@ function Noclip.toggle(enabled)
     _G.updateSettings("noclipEnabled", enabled)
 end
 
-return Noclip

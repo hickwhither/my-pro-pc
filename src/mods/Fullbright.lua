@@ -80,4 +80,3 @@ function Fullbright.toggle(enabled)
     _G.updateSettings("fullbrightEnabled", enabled)
 end
 
-return Fullbright
