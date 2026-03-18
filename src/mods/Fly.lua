@@ -5,9 +5,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
-local ENABLED_KEY = "flyEnabled"
-local KEYBIND_KEY = "flyKeybind"
-local DEFAULT_KEYBIND = "F8"
+Fly.defaultKeybind = "F8"
+
 local FLY_SPEED = 75
 local VERTICAL_SPEED = 1
 
@@ -34,14 +33,6 @@ local movementKeys = {
     [Enum.KeyCode.LeftControl] = "down",
     [Enum.KeyCode.RightControl] = "down",
 }
-
-local function keyCodeFromSetting(value)
-    if typeof(value) ~= "string" then
-        return nil
-    end
-
-    return Enum.KeyCode[value:upper()]
-end
 
 local function getCharacter()
     return localPlayer and localPlayer.Character
@@ -213,19 +204,7 @@ local function startFlight()
     return true
 end
 
-function Fly.toggle(enabled)
-    if enabled then
-        if not startFlight() then
-            enabled = false
-        end
-    else
-        stopFlight()
-    end
-
-    _G.updateSettings(ENABLED_KEY, enabled)
-end
-
-local function bindInput()
+local function bindMovementInput()
     if inputBeganConnection then
         return
     end
@@ -235,14 +214,8 @@ local function bindInput()
             return
         end
 
-        local keyCode = keyCodeFromSetting(_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND))
-        if keyCode and input.KeyCode == keyCode then
-            Fly.toggle(not _G.getSetting(ENABLED_KEY, false))
-            return
-        end
-
         local direction = movementKeys[input.KeyCode]
-        if direction and _G.getSetting(ENABLED_KEY, false) then
+        if direction and _G.getSetting("flyEnabled", false) then
             activeDirections[direction] = true
         end
     end)
@@ -259,12 +232,18 @@ local function bindInput()
     end)
 end
 
-_G.getSetting(ENABLED_KEY, false)
-_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND)
-bindInput()
+function Fly.toggle(enabled)
+    if enabled then
+        if not startFlight() then
+            enabled = false
+        end
+    else
+        stopFlight()
+    end
 
-if _G.getSetting(ENABLED_KEY, false) then
-    Fly.toggle(true)
+    _G.updateSettings("flyEnabled", enabled)
 end
+
+bindMovementInput()
 
 return Fly

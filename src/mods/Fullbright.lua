@@ -1,23 +1,11 @@
 local Fullbright = _G.offlineservice("Fullbright")
 
 local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
 
-local ENABLED_KEY = "fullbrightEnabled"
-local KEYBIND_KEY = "fullbrightKeybind"
-local DEFAULT_KEYBIND = "F6"
+Fullbright.defaultKeybind = "F6"
 
 local originalLighting
 local propertyConnections = {}
-local inputConnection
-
-local function keyCodeFromSetting(value)
-    if typeof(value) ~= "string" then
-        return nil
-    end
-
-    return Enum.KeyCode[value:upper()]
-end
 
 local function saveOriginalLighting()
     if originalLighting then
@@ -65,9 +53,7 @@ local function connectPropertyLocks()
 
     for _, propertyName in ipairs(properties) do
         table.insert(propertyConnections, Lighting:GetPropertyChangedSignal(propertyName):Connect(function()
-            if _G.getSetting(ENABLED_KEY, false) then
-                applyFullbright()
-            end
+            applyFullbright()
         end))
     end
 end
@@ -91,32 +77,7 @@ function Fullbright.toggle(enabled)
         end
     end
 
-    _G.updateSettings(ENABLED_KEY, enabled)
-end
-
-local function bindInput()
-    if inputConnection then
-        return
-    end
-
-    inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then
-            return
-        end
-
-        local keyCode = keyCodeFromSetting(_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND))
-        if keyCode and input.KeyCode == keyCode then
-            Fullbright.toggle(not _G.getSetting(ENABLED_KEY, false))
-        end
-    end)
-end
-
-_G.getSetting(ENABLED_KEY, false)
-_G.getSetting(KEYBIND_KEY, DEFAULT_KEYBIND)
-bindInput()
-
-if _G.getSetting(ENABLED_KEY, false) then
-    Fullbright.toggle(true)
+    _G.updateSettings("fullbrightEnabled", enabled)
 end
 
 return Fullbright
