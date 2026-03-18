@@ -1,10 +1,12 @@
 local AnglerSafety = _G.offlineservice("AnglerSafety")
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local ESP_ENABLED_KEY = "anglerSafetyEspEnabled"
 local SAFE_TP_ENABLED_KEY = "anglerSafetySafeTpEnabled"
+local SAFE_HEIGHT = 200
 local WATCH_NAMES = {
     angler = true,
     froger = true,
@@ -15,9 +17,16 @@ local WATCH_NAMES = {
 
 local workspaceAddedConnection
 local workspaceRemovingConnection
+local heartbeatConnection
 local trackedEntities = {}
 local highlightedEntities = {}
-local teleportedEntities = {}
+local clearEsp
+local safeModeState = {
+    active = false,
+    originalCFrame = nil,
+    bodyVelocity = nil,
+    bodyGyro = nil,
+}
 
 local function matchesAnglerEntity(instance)
     if not instance or instance:IsA("Attachment") or instance:IsA("Beam") then
@@ -34,9 +43,13 @@ local function matchesAnglerEntity(instance)
     return false
 end
 
-local function getCharacterRoot()
+local function getCharacterParts()
     local player = Players.LocalPlayer
-    return player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    local character = player and player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    return character, rootPart, humanoid
 end
 
 local function resolveAdornee(target)
@@ -47,6 +60,19 @@ local function resolveAdornee(target)
     if target:IsA("Model") then
         return target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart", true)
     end
+end
+
+local function hasDangerousEntity()
+    for entity in pairs(trackedEntities) do
+        if entity and entity.Parent then
+            return true
+        end
+
+        trackedEntities[entity] = nil
+        clearEsp(entity)
+    end
+
+    return false
 end
 
 local function createEsp(entity)
@@ -93,7 +119,7 @@ local function createEsp(entity)
     }
 end
 
-local function clearEsp(entity)
+clearEsp = function(entity)
     local visuals = highlightedEntities[entity]
     if not visuals then
         return
@@ -110,74 +136,79 @@ local function clearEsp(entity)
     highlightedEntities[entity] = nil
 end
 
-local function getLockerPosition(locker)
-    if locker:IsA("Model") then
-        local proxyPart = locker:FindFirstChild("ProxyPart", true)
-        if proxyPart and proxyPart:IsA("BasePart") then
-            return proxyPart.Position
-        end
-
-        local part = locker.PrimaryPart or locker:FindFirstChildWhichIsA("BasePart", true)
-        if part then
-            return part.Position
-        end
-    elseif locker:IsA("BasePart") then
-        return locker.Position
+local function clearAllEsp()
+    for entity in pairs(highlightedEntities) do
+        clearEsp(entity)
     end
-
-    return nil
 end
 
-local function findNearestLocker(origin)
-    local nearestLocker
-    local nearestDistance
-
-    for _, descendant in ipairs(Workspace:GetDescendants()) do
-        if descendant.Name == "Locker" then
-            local lockerPosition = getLockerPosition(descendant)
-            if lockerPosition then
-                local distance = (lockerPosition - origin).Magnitude
-                if not nearestDistance or distance < nearestDistance then
-                    nearestDistance = distance
-                    nearestLocker = descendant
-                end
-            end
-        end
+local function enableSafeHeightMode()
+    if safeModeState.active then
+        return
     end
 
-    return nearestLocker
+    local _, rootPart, humanoid = getCharacterParts()
+    if not rootPart or not humanoid then
+        return
+    end
+
+    safeModeState.originalCFrame = rootPart.CFrame
+    safeModeState.active = true
+
+    humanoid.PlatformStand = true
+
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "AnglerSafetyVelocity"
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Velocity = Vector3.zero
+    bodyVelocity.Parent = rootPart
+
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.Name = "AnglerSafetyGyro"
+    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    bodyGyro.CFrame = rootPart.CFrame
+    bodyGyro.Parent = rootPart
+
+    safeModeState.bodyVelocity = bodyVelocity
+    safeModeState.bodyGyro = bodyGyro
+
+    rootPart.CFrame = CFrame.new(rootPart.Position.X, SAFE_HEIGHT, rootPart.Position.Z)
 end
 
-local function teleportToSafeLocker(entity)
-    if teleportedEntities[entity] then
+local function disableSafeHeightMode()
+    if not safeModeState.active then
         return
     end
 
-    local rootPart = getCharacterRoot()
-    if not rootPart then
-        return
+    local _, rootPart, humanoid = getCharacterParts()
+    safeModeState.active = false
+
+    if humanoid then
+        humanoid.PlatformStand = false
     end
 
-    local locker = findNearestLocker(rootPart.Position)
-    if not locker then
-        warn("[AnglerSafety] No locker found for safe teleport")
-        return
+    if safeModeState.bodyVelocity then
+        safeModeState.bodyVelocity:Destroy()
+        safeModeState.bodyVelocity = nil
     end
 
-    local lockerPosition = getLockerPosition(locker)
-    if not lockerPosition then
-        return
+    if safeModeState.bodyGyro then
+        safeModeState.bodyGyro:Destroy()
+        safeModeState.bodyGyro = nil
     end
 
-    rootPart.CFrame = CFrame.new(lockerPosition + Vector3.new(0, 3, 0))
-    teleportedEntities[entity] = true
+    if rootPart and safeModeState.originalCFrame then
+        rootPart.CFrame = safeModeState.originalCFrame + Vector3.new(0, 3, 0)
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+    end
+
+    safeModeState.originalCFrame = nil
 end
 
 local function refreshEntity(entity)
     if not entity or not entity.Parent then
         clearEsp(entity)
         trackedEntities[entity] = nil
-        teleportedEntities[entity] = nil
         return
     end
 
@@ -188,10 +219,6 @@ local function refreshEntity(entity)
     else
         clearEsp(entity)
     end
-
-    if _G.getSetting(SAFE_TP_ENABLED_KEY, false) then
-        teleportToSafeLocker(entity)
-    end
 end
 
 local function scanWorkspace()
@@ -200,6 +227,21 @@ local function scanWorkspace()
             refreshEntity(descendant)
         end
     end
+end
+
+local function ensureHeartbeat()
+    if heartbeatConnection then
+        return
+    end
+
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        local shouldUseSafeMode = _G.getSetting(SAFE_TP_ENABLED_KEY, false) and hasDangerousEntity()
+        if shouldUseSafeMode then
+            enableSafeHeightMode()
+        else
+            disableSafeHeightMode()
+        end
+    end)
 end
 
 local function ensureWatcher()
@@ -219,7 +261,6 @@ local function ensureWatcher()
         if trackedEntities[descendant] or highlightedEntities[descendant] then
             clearEsp(descendant)
             trackedEntities[descendant] = nil
-            teleportedEntities[descendant] = nil
         end
     end)
 
@@ -241,12 +282,14 @@ local function stopWatcherIfUnused()
         workspaceRemovingConnection = nil
     end
 
-    for entity in pairs(highlightedEntities) do
-        clearEsp(entity)
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
     end
 
+    clearAllEsp()
+    disableSafeHeightMode()
     table.clear(trackedEntities)
-    table.clear(teleportedEntities)
 end
 
 function AnglerSafety:kill()
@@ -267,9 +310,7 @@ AnglerSafety:registerToggle({
             ensureWatcher()
             scanWorkspace()
         else
-            for entity in pairs(highlightedEntities) do
-                clearEsp(entity)
-            end
+            clearAllEsp()
             stopWatcherIfUnused()
         end
     end,
@@ -283,9 +324,10 @@ AnglerSafety:registerToggle({
     onToggle = function(enabled)
         if enabled then
             ensureWatcher()
+            ensureHeartbeat()
             scanWorkspace()
         else
-            table.clear(teleportedEntities)
+            disableSafeHeightMode()
             stopWatcherIfUnused()
         end
     end,
