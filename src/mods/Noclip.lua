@@ -3,7 +3,7 @@ local Noclip = _G.offlineservice("Noclip")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-Noclip.defaultKeybind = "F7"
+local ENABLED_KEY = "noclipEnabled"
 
 local localPlayer = Players.LocalPlayer
 local stepConnection
@@ -24,26 +24,45 @@ local function setCharacterCollision(character, canCollide)
     end
 end
 
-function Noclip.toggle(enabled)
-    if enabled then
-        if stepConnection then
-            stepConnection:Disconnect()
-        end
-
-        stepConnection = RunService.Stepped:Connect(function()
-            setCharacterCollision(getCharacter(), false)
-        end)
-
-        setCharacterCollision(getCharacter(), false)
-    else
-        if stepConnection then
-            stepConnection:Disconnect()
-            stepConnection = nil
-        end
-
-        setCharacterCollision(getCharacter(), true)
+function Noclip:enable()
+    if stepConnection then
+        stepConnection:Disconnect()
     end
 
-    _G.updateSettings("noclipEnabled", enabled)
+    stepConnection = RunService.Stepped:Connect(function()
+        setCharacterCollision(getCharacter(), false)
+    end)
+
+    setCharacterCollision(getCharacter(), false)
 end
 
+function Noclip:disable()
+    if stepConnection then
+        stepConnection:Disconnect()
+        stepConnection = nil
+    end
+
+    setCharacterCollision(getCharacter(), true)
+end
+
+function Noclip:kill()
+    self:disable()
+    self:setState(ENABLED_KEY, false)
+    _G.updateSettings(ENABLED_KEY, false)
+end
+
+Noclip:registerToggle({
+    id = "NoclipToggle",
+    settingKey = ENABLED_KEY,
+    keybindKey = "noclipKeybind",
+    defaultKeybind = "F7",
+    onToggle = function(enabled)
+        if enabled then
+            Noclip:enable()
+        else
+            Noclip:disable()
+        end
+    end,
+})
+
+return Noclip

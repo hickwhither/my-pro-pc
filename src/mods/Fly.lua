@@ -5,8 +5,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
-Fly.defaultKeybind = "F8"
-
+local ENABLED_KEY = "flyEnabled"
 local FLY_SPEED = 75
 local VERTICAL_SPEED = 1
 
@@ -193,7 +192,7 @@ local function startFlight()
     stepConnection = RunService.RenderStepped:Connect(function()
         local currentCharacter = getCharacter()
         if currentCharacter ~= character or not rootPart.Parent then
-            Fly.toggle(false)
+            Fly:kill()
             return
         end
 
@@ -215,7 +214,7 @@ local function bindMovementInput()
         end
 
         local direction = movementKeys[input.KeyCode]
-        if direction and _G.getSetting("flyEnabled", false) then
+        if direction and _G.getSetting(ENABLED_KEY, false) then
             activeDirections[direction] = true
         end
     end)
@@ -232,17 +231,37 @@ local function bindMovementInput()
     end)
 end
 
-function Fly.toggle(enabled)
-    if enabled then
-        if not startFlight() then
-            enabled = false
-        end
-    else
-        stopFlight()
+function Fly:enable()
+    if not startFlight() then
+        self:setState(ENABLED_KEY, false)
+        _G.updateSettings(ENABLED_KEY, false)
     end
-
-    _G.updateSettings("flyEnabled", enabled)
 end
+
+function Fly:disable()
+    stopFlight()
+end
+
+function Fly:kill()
+    self:disable()
+    self:setState(ENABLED_KEY, false)
+    _G.updateSettings(ENABLED_KEY, false)
+end
+
+Fly:registerToggle({
+    id = "FlyToggle",
+    settingKey = ENABLED_KEY,
+    keybindKey = "flyKeybind",
+    defaultKeybind = "F8",
+    onToggle = function(enabled)
+        if enabled then
+            Fly:enable()
+        else
+            Fly:disable()
+        end
+    end,
+})
 
 bindMovementInput()
 
+return Fly
