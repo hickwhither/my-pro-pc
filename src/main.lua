@@ -135,9 +135,10 @@ print("The PRO PC is on now!")
 fetchSettings()
 
 local mods = {
-    "mods/Explorer.lua",
     "mods/Fullbright.lua",
     "mods/Noclip.lua",
+    "mods/Fly.lua",
+    "mods/Destroy.lua",
 }
 
 for _, moduleName in ipairs(mods) do
