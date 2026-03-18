@@ -20,6 +20,10 @@ local function keyCodeFromSetting(value)
     return Enum.KeyCode[value:upper()]
 end
 
+local function getCharacter()
+    return localPlayer and localPlayer.Character
+end
+
 local function setCharacterCollision(character, canCollide)
     if not character then
         return
@@ -30,10 +34,6 @@ local function setCharacterCollision(character, canCollide)
             descendant.CanCollide = canCollide
         end
     end
-end
-
-local function getCharacter()
-    return localPlayer and localPlayer.Character
 end
 
 function Noclip.toggle(enabled)
