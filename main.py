@@ -1,12 +1,38 @@
-from flask import Flask, send_from_directory, jsonify, request, send_file
+from flask import Flask, send_from_directory, jsonify, request, send_file, Response
 import json
 import os
 
+
 app = Flask(__name__)
+
+
+def to_lua(value):
+    if isinstance(value, dict):
+        items = []
+        for key, nested_value in value.items():
+            items.append(f'[{json.dumps(str(key))}] = {to_lua(nested_value)}')
+        return '{' + ', '.join(items) + '}'
+    if isinstance(value, list):
+        items = [to_lua(item) for item in value]
+        return '{' + ', '.join(items) + '}'
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if value is None:
+        return 'nil'
+    if isinstance(value, str):
+        return json.dumps(value)
+    return str(value)
 
 @app.route('/')
 def index():
     return send_file('index.html')
+
+@app.route('/settings.lua')
+def settings_lua():
+    with open('settings.json', 'r') as f:
+        data = json.load(f)
+    return Response('return ' + to_lua(data), mimetype='text/plain')
+
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -34,7 +60,7 @@ def update_settings():
     key = request.args.get('key')
     value_str = request.args.get('value')
     if value_str:
-        value = json.loads(value_str)
+        value = json.loads(value_str) if value_str.startswith(('{', '[', '"')) or value_str in {'true', 'false', 'null'} or value_str.replace('.', '', 1).lstrip('-').isdigit() else value_str
     else:
         value = None
     with open('settings.json', 'r') as f:
