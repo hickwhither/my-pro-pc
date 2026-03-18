@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings Manager</title>
+</head>
+<body>
+    <h1>Settings Manager</h1>
+    <div id="settings"></div>
+    <h2>Add New Setting</h2>
+    <input type="text" id="newKey" placeholder="Key">
+    <input type="text" id="newValue" placeholder="Value">
+    <select id="newType">
+        <option value="string">String</option>
+        <option value="int">Int</option>
+        <option value="bool">Bool</option>
+    </select>
+    <button onclick="addSetting()">Add</button>
+    <h2>Explorer</h2>
+    <div id="explorer"></div>
+    <script>
+        function loadSettings() {
+            fetch('/settings')
+                .then(response => response.json())
+                .then(data => {
+                    const div = document.getElementById('settings');
+                    div.innerHTML = '<h2>Current Settings</h2>';
+                    for (const [key, value] of Object.entries(data)) {
+                        const type = typeof value;
+                        let inputHtml;
+                        if (type === 'boolean') {
+                            inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${key}', this.checked, 'bool')">`;
+                        } else if (type === 'number') {
+                            inputHtml = `<input type="number" value="${value}" oninput="updateSetting('${key}', this.value, 'int')">`;
+                        } else {
+                            inputHtml = `<input type="text" value="${value}" oninput="updateSetting('${key}', this.value, 'string')">`;
+                        }
+                        div.innerHTML += `<div>${key}: ${inputHtml} <button onclick="removeSetting('${key}')">Remove</button></div>`;
+                    }
+                });
+        }
+        function updateSetting(key, value, type) {
+            if (type === 'int') value = value.trim() ? parseInt(value) : 0;
+            else if (type === 'bool') value = value;
+            fetch('/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'update', key, value})
+            });
+        }
+        function addSetting() {
+            const key = document.getElementById('newKey').value;
+            const valueStr = document.getElementById('newValue').value;
+            const type = document.getElementById('newType').value;
+            let value;
+            if (type === 'int') value = valueStr.trim() ? parseInt(valueStr) : 0;
+            else if (type === 'bool') value = valueStr.trim() ? valueStr.toLowerCase() === 'true' : false;
+            else value = valueStr;
+            fetch('/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'add', key, value})
+            }).then(() => {
+                document.getElementById('newKey').value = '';
+                document.getElementById('newValue').value = '';
+                loadSettings();
+            });
+        }
+        function removeSetting(key) {
+            fetch('/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'remove', key})
+            }).then(() => loadSettings());
+        }
+        function loadExplorer() {
+            fetch('/instances')
+                .then(response => response.json())
+                .then(data => {
+                    const div = document.getElementById('explorer');
+                    div.innerHTML = '';
+                    data.forEach(inst => {
+                        div.innerHTML += `<div>${inst.path} (${inst.class})</div>`;
+                    });
+                });
+        }
+        loadSettings();
+        loadExplorer();
+    </script>
+</body>
+</html>
