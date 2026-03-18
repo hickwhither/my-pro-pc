@@ -1,6 +1,8 @@
 local baseUrl = ""
 baseUrl = "http://localhost:5000/src/" -- debug
 
+local UserInputService = game:GetService("UserInputService")
+
 local function encodeValue(value)
     local valueType = type(value)
 
@@ -130,24 +132,129 @@ _G.getSetting = function(key, defaultValue)
     return _G.settings[key]
 end
 
-print("The PRO PC is on now!")
+local function keyCodeFromSetting(value)
+    if typeof(value) ~= "string" then
+        return nil
+    end
 
-fetchSettings()
+    return Enum.KeyCode[value:upper()]
+end
 
-local mods = {
-    "mods/Fullbright.lua",
-    "mods/Noclip.lua",
-    "mods/Fly.lua",
-    "mods/Destroy.lua",
+local function buildSettingKey(modName, suffix)
+    return string.lower(modName) .. suffix
+end
+
+local loadedMods = {}
+
+local modDefinitions = {
+    {
+        name = "Fullbright",
+        moduleName = "mods/Fullbright.lua",
+    },
+    {
+        name = "Noclip",
+        moduleName = "mods/Noclip.lua",
+    },
+    {
+        name = "Fly",
+        moduleName = "mods/Fly.lua",
+    },
+    {
+        name = "Destroy",
+        defaultKeybind = "F9",
+        isMomentary = true,
+        run = function()
+            local targetMods = {"Fullbright", "Noclip", "Fly"}
+
+            for _, modName in ipairs(targetMods) do
+                local targetMod = loadedMods[modName]
+                local enabledKey = buildSettingKey(modName, "Enabled")
+                if targetMod and type(targetMod.toggle) == "function" then
+                    targetMod.toggle(false)
+                else
+                    _G.updateSettings(enabledKey, false)
+                end
+            end
+
+            _G.updateSettings("destroyEnabled", false)
+        end,
+    },
 }
 
-for _, moduleName in ipairs(mods) do
-    fetch(moduleName)
+local modStates = {}
+
+local function syncMods(settings)
+    for _, modInfo in ipairs(modDefinitions) do
+        local enabledKey = modInfo.enabledKey
+        local enabled = settings[enabledKey]
+
+        if enabled == nil then
+            enabled = false
+            _G.updateSettings(enabledKey, enabled)
+        end
+
+        if modInfo.run then
+            if enabled then
+                modInfo.run()
+            end
+        else
+            local loadedMod = loadedMods[modInfo.name]
+            if loadedMod and type(loadedMod.toggle) == "function" and modStates[modInfo.name] ~= enabled then
+                loadedMod.toggle(enabled)
+                modStates[modInfo.name] = enabled
+            end
+        end
+    end
 end
+
+local function bindInput()
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then
+            return
+        end
+
+        for _, modInfo in ipairs(modDefinitions) do
+            local keybind = _G.getSetting(modInfo.keybindKey, modInfo.defaultKeybind)
+            local keyCode = keyCodeFromSetting(keybind)
+            if keyCode and input.KeyCode == keyCode then
+                if modInfo.isMomentary then
+                    _G.updateSettings(modInfo.enabledKey, true)
+                else
+                    _G.updateSettings(modInfo.enabledKey, not _G.getSetting(modInfo.enabledKey, false))
+                end
+                return
+            end
+        end
+    end)
+end
+
+print("The PRO PC is on now!")
+
+local settings = fetchSettings()
+
+for _, modInfo in ipairs(modDefinitions) do
+    modInfo.enabledKey = buildSettingKey(modInfo.name, "Enabled")
+    modInfo.keybindKey = buildSettingKey(modInfo.name, "Keybind")
+
+    if modInfo.moduleName then
+        local loadedMod = fetch(modInfo.moduleName)
+        if loadedMod then
+            loadedMods[modInfo.name] = loadedMod
+            modInfo.defaultKeybind = loadedMod.defaultKeybind
+            modStates[modInfo.name] = false
+        end
+    end
+
+    _G.getSetting(modInfo.enabledKey, false)
+    _G.getSetting(modInfo.keybindKey, modInfo.defaultKeybind)
+end
+
+syncMods(settings)
+bindInput()
 
 task.spawn(function()
     while true do
-        fetchSettings()
+        syncMods(fetchSettings())
         task.wait(1)
     end
 end)
