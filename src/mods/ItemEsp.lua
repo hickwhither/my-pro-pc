@@ -77,80 +77,64 @@ local function getPaperPassword(target)
     return "????"
 end
 
+local function buildTargetData(target, prompt, kind, color, label, shouldAutoPickup)
+    return {
+        id = target,
+        instance = target,
+        prompt = prompt,
+        kind = kind,
+        color = color,
+        label = label,
+        shouldAutoPickup = shouldAutoPickup,
+        allowRemoteUse = true,
+        originalPromptState = {
+            maxActivationDistance = prompt.MaxActivationDistance,
+            requiresLineOfSight = prompt.RequiresLineOfSight,
+            holdDuration = prompt.HoldDuration,
+        },
+    }
+end
+
 local function classifyTarget(instance)
     if not instance or instance:IsA("Attachment") or instance:IsA("Beam") then
         return nil
     end
 
-    local target = instance
-    if instance.Name == "ProxyPart" and instance.Parent then
-        target = instance.Parent
-    end
+    local name = instance.Name or ""
 
-    if not target or not target.Parent then
+    if name == "PasswordPaper" then
+        local prompt = findPrompt(instance)
+        if prompt and prompt.Enabled then
+            return buildTargetData(
+                instance,
+                prompt,
+                "paper",
+                PAPER_COLOR,
+                "Pass: " .. getPaperPassword(instance),
+                true
+            )
+        end
+
         return nil
     end
 
-    local prompt = findPrompt(target)
-    if not prompt or not prompt.Enabled then
+    if string.find(name, "KeyCard", 1, true) then
+        local proxy = instance:FindFirstChild("ProxyPart", true)
+        local prompt = findPrompt(proxy)
+        if proxy and prompt and prompt.Enabled then
+            return buildTargetData(instance, prompt, "keycard", KEYCARD_COLOR, name, true)
+        end
+
         return nil
     end
 
-    local name = target.Name or ""
-    local lowerName = string.lower(name)
+    if name == "Generator" then
+        local prompt = findPrompt(instance)
+        if prompt and prompt.Enabled then
+            return buildTargetData(instance, prompt, "generator", GENERATOR_COLOR, "Generator", false)
+        end
 
-    if string.find(lowerName, "passwordpaper", 1, true) then
-        return {
-            id = target,
-            instance = target,
-            prompt = prompt,
-            kind = "paper",
-            color = PAPER_COLOR,
-            label = "Paper: " .. getPaperPassword(target),
-            shouldAutoPickup = true,
-            allowRemoteUse = true,
-            originalPromptState = {
-                maxActivationDistance = prompt.MaxActivationDistance,
-                requiresLineOfSight = prompt.RequiresLineOfSight,
-                holdDuration = prompt.HoldDuration,
-            },
-        }
-    end
-
-    if string.find(lowerName, "keycard", 1, true) then
-        return {
-            id = target,
-            instance = target,
-            prompt = prompt,
-            kind = "keycard",
-            color = KEYCARD_COLOR,
-            label = name,
-            shouldAutoPickup = true,
-            allowRemoteUse = true,
-            originalPromptState = {
-                maxActivationDistance = prompt.MaxActivationDistance,
-                requiresLineOfSight = prompt.RequiresLineOfSight,
-                holdDuration = prompt.HoldDuration,
-            },
-        }
-    end
-
-    if string.find(lowerName, "generator", 1, true) then
-        return {
-            id = target,
-            instance = target,
-            prompt = prompt,
-            kind = "generator",
-            color = GENERATOR_COLOR,
-            label = "Generator",
-            shouldAutoPickup = false,
-            allowRemoteUse = true,
-            originalPromptState = {
-                maxActivationDistance = prompt.MaxActivationDistance,
-                requiresLineOfSight = prompt.RequiresLineOfSight,
-                holdDuration = prompt.HoldDuration,
-            },
-        }
+        return nil
     end
 
     return nil
