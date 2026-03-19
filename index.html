@@ -1,60 +1,457 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings Manager</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #07111f;
+            --bg-accent: radial-gradient(circle at top, rgba(56, 189, 248, 0.22), transparent 36%),
+                         radial-gradient(circle at right, rgba(59, 130, 246, 0.16), transparent 28%),
+                         linear-gradient(160deg, #020617 0%, #0f172a 55%, #111827 100%);
+            --panel: rgba(15, 23, 42, 0.78);
+            --panel-strong: rgba(15, 23, 42, 0.96);
+            --panel-border: rgba(148, 163, 184, 0.18);
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --primary-strong: #0ea5e9;
+            --success: #34d399;
+            --danger: #fb7185;
+            --shadow: 0 20px 60px rgba(2, 8, 23, 0.45);
+            --radius: 24px;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg-accent);
+            color: var(--text);
+            padding: 48px 20px;
+        }
+
+        .shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            display: grid;
+            gap: 24px;
+        }
+
+        .hero,
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(22px);
+        }
+
+        .hero {
+            padding: 32px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .hero h1 {
+            margin: 0 0 12px;
+            font-size: clamp(2rem, 3vw, 3.4rem);
+            letter-spacing: -0.04em;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 680px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+            gap: 14px;
+            min-width: 260px;
+        }
+
+        .stat {
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(30, 41, 59, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .stat span {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .stat strong {
+            font-size: 1.6rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.3fr 0.9fr;
+            gap: 24px;
+        }
+
+        .panel {
+            padding: 26px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .subtitle {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .pill {
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--primary);
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        .settings-list,
+        .explorer-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .setting-card,
+        .instance-card {
+            border-radius: 20px;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            padding: 18px;
+        }
+
+        .setting-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 18px;
+            align-items: center;
+        }
+
+        .setting-key {
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0 0 6px;
+        }
+
+        .meta-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .type-badge {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.12);
+            color: #cbd5e1;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+        }
+
+        .setting-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input,
+        select,
+        button {
+            font: inherit;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(15, 23, 42, 0.9);
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: rgba(56, 189, 248, 0.8);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.14);
+        }
+
+        input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            accent-color: var(--success);
+            cursor: pointer;
+        }
+
+        button {
+            border: none;
+            border-radius: 14px;
+            padding: 12px 18px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .primary-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+            color: white;
+            box-shadow: 0 10px 22px rgba(14, 165, 233, 0.28);
+        }
+
+        .ghost-btn {
+            background: rgba(251, 113, 133, 0.14);
+            color: #fecdd3;
+            border: 1px solid rgba(251, 113, 133, 0.22);
+        }
+
+        .form-grid {
+            display: grid;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .form-grid.three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .empty-state {
+            padding: 28px;
+            text-align: center;
+            color: var(--muted);
+            border: 1px dashed rgba(148, 163, 184, 0.2);
+            border-radius: 20px;
+            background: rgba(15, 23, 42, 0.48);
+        }
+
+        .instance-card {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .instance-path {
+            margin: 0;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .instance-class {
+            margin: 8px 0 0;
+            color: var(--muted);
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            .grid,
+            .form-grid.three {
+                grid-template-columns: 1fr;
+            }
+
+            .setting-card {
+                grid-template-columns: 1fr;
+            }
+
+            .setting-actions {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .stats {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Settings Manager</h1>
-    <div id="settings"></div>
-    <h2>Add New Setting</h2>
-    <input type="text" id="newKey" placeholder="Key">
-    <input type="text" id="newValue" placeholder="Value">
-    <select id="newType">
-        <option value="string">String</option>
-        <option value="int">Int</option>
-        <option value="bool">Bool</option>
-    </select>
-    <button onclick="addSetting()">Add</button>
-    <h2>Explorer</h2>
-    <div id="explorer"></div>
+    <div class="shell">
+        <section class="hero">
+            <div>
+                <h1>Settings Manager</h1>
+                <p>
+                    A cleaner control center for live configuration updates and instance inspection.
+                    Manage values instantly, add new entries quickly, and keep the explorer readable.
+                </p>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <span>Total settings</span>
+                    <strong id="settingsCount">0</strong>
+                </div>
+                <div class="stat">
+                    <span>Live instances</span>
+                    <strong id="instancesCount">0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Current Settings</h2>
+                        <p class="subtitle">Edit values inline. Changes are sent immediately.</p>
+                    </div>
+                    <span class="pill">Auto-refresh</span>
+                </div>
+                <div id="settings" class="settings-list"></div>
+            </div>
+
+            <div class="panel">
+                <div>
+                    <h2 class="panel-title">Add New Setting</h2>
+                    <p class="subtitle">Create string, integer, or boolean values in a focused form.</p>
+                </div>
+                <div class="form-grid three">
+                    <input type="text" id="newKey" placeholder="Setting key">
+                    <input type="text" id="newValue" placeholder="Default value">
+                    <select id="newType">
+                        <option value="string">String</option>
+                        <option value="int">Integer</option>
+                        <option value="bool">Boolean</option>
+                    </select>
+                </div>
+                <div class="form-grid">
+                    <button class="primary-btn" onclick="addSetting()">Add Setting</button>
+                </div>
+                <p class="footer-note">For boolean values, type <strong>true</strong> or <strong>false</strong>.</p>
+
+                <div class="panel-header" style="margin-top: 34px;">
+                    <div>
+                        <h2 class="panel-title">Explorer</h2>
+                        <p class="subtitle">Quick overview of discovered instances and classes.</p>
+                    </div>
+                    <span class="pill" id="explorerStatus">Idle</span>
+                </div>
+                <div id="explorer" class="explorer-list"></div>
+            </div>
+        </section>
+    </div>
+
     <script>
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderEmptyState(message) {
+            return `<div class="empty-state">${message}</div>`;
+        }
+
         function loadSettings() {
             fetch('/settings')
                 .then(response => response.json())
                 .then(data => {
                     const div = document.getElementById('settings');
-                    div.innerHTML = '<h2>Current Settings</h2>';
-                    for (const [key, value] of Object.entries(data)) {
-                        const type = typeof value;
-                        let inputHtml;
-                        if (type === 'boolean') {
-                            inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${key}', this.checked, 'bool')">`;
-                        } else if (type === 'number') {
-                            inputHtml = `<input type="number" value="${value}" oninput="updateSetting('${key}', this.value, 'int')">`;
-                        } else {
-                            inputHtml = `<input type="text" value="${value}" oninput="updateSetting('${key}', this.value, 'string')">`;
-                        }
-                        div.innerHTML += `<div>${key}: ${inputHtml} <button onclick="removeSetting('${key}')">Remove</button></div>`;
+                    const entries = Object.entries(data);
+                    document.getElementById('settingsCount').textContent = entries.length;
+
+                    if (!entries.length) {
+                        div.innerHTML = renderEmptyState('No settings found yet. Add one from the panel on the right.');
+                        return;
                     }
+
+                    div.innerHTML = entries.map(([key, value]) => {
+                        const type = typeof value;
+                        let inputHtml = '';
+                        let displayValue = value;
+
+                        if (type === 'boolean') {
+                            inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${escapeHtml(key)}', this.checked, 'bool')">`;
+                            displayValue = value ? 'Enabled' : 'Disabled';
+                        } else if (type === 'number') {
+                            inputHtml = `<input type="number" value="${value}" oninput="updateSetting('${escapeHtml(key)}', this.value, 'int')">`;
+                        } else {
+                            inputHtml = `<input type="text" value="${escapeHtml(value)}" oninput="updateSetting('${escapeHtml(key)}', this.value, 'string')">`;
+                        }
+
+                        return `
+                            <div class="setting-card">
+                                <div>
+                                    <p class="setting-key">${escapeHtml(key)}</p>
+                                    <div class="meta-row">
+                                        <span class="type-badge">${type}</span>
+                                        <span>Current value: ${escapeHtml(displayValue)}</span>
+                                    </div>
+                                </div>
+                                <div class="setting-actions">
+                                    ${inputHtml}
+                                    <button class="ghost-btn" onclick="removeSetting('${escapeHtml(key)}')">Remove</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                 });
         }
+
         function updateSetting(key, value, type) {
-            if (type === 'int') value = value.trim() ? parseInt(value) : 0;
-            else if (type === 'bool') value = value;
+            if (type === 'int') value = value.trim() ? parseInt(value, 10) : 0;
             fetch('/settings', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({action: 'update', key, value})
             });
         }
+
         function addSetting() {
             const key = document.getElementById('newKey').value;
             const valueStr = document.getElementById('newValue').value;
             const type = document.getElementById('newType').value;
             let value;
-            if (type === 'int') value = valueStr.trim() ? parseInt(valueStr) : 0;
+
+            if (type === 'int') value = valueStr.trim() ? parseInt(valueStr, 10) : 0;
             else if (type === 'bool') value = valueStr.trim() ? valueStr.toLowerCase() === 'true' : false;
             else value = valueStr;
+
             fetch('/settings', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -65,6 +462,7 @@
                 loadSettings();
             });
         }
+
         function removeSetting(key) {
             fetch('/settings', {
                 method: 'POST',
@@ -72,17 +470,36 @@
                 body: JSON.stringify({action: 'remove', key})
             }).then(() => loadSettings());
         }
+
         function loadExplorer() {
+            document.getElementById('explorerStatus').textContent = 'Syncing';
             fetch('/instances')
                 .then(response => response.json())
                 .then(data => {
                     const div = document.getElementById('explorer');
-                    div.innerHTML = '';
-                    data.forEach(inst => {
-                        div.innerHTML += `<div>${inst.path} (${inst.class})</div>`;
-                    });
+                    document.getElementById('instancesCount').textContent = data.length;
+                    document.getElementById('explorerStatus').textContent = data.length ? 'Live' : 'Empty';
+
+                    if (!data.length) {
+                        div.innerHTML = renderEmptyState('No instances returned by the explorer endpoint.');
+                        return;
+                    }
+
+                    div.innerHTML = data.map(inst => `
+                        <div class="instance-card">
+                            <div>
+                                <p class="instance-path">${escapeHtml(inst.path)}</p>
+                                <p class="instance-class">Class: ${escapeHtml(inst.class)}</p>
+                            </div>
+                            <span class="type-badge">${escapeHtml(inst.class)}</span>
+                        </div>
+                    `).join('');
+                })
+                .catch(() => {
+                    document.getElementById('explorerStatus').textContent = 'Error';
                 });
         }
+
         loadSettings();
         loadExplorer();
         setInterval(loadSettings, 500);
