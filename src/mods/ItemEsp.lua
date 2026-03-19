@@ -18,7 +18,7 @@ local ITEM_COLORS = {
 
 local REMOTE_DISTANCE = 9999
 local AUTO_PICKUP_INTERVAL = 0.2
-local AUTO_PICKUP_DISTANCE = 8
+local AUTO_PICKUP_DISTANCE = 10
 
 local trackedTargets = {}
 local activeVisuals = {}
