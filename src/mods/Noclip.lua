@@ -7,9 +7,17 @@ local ENABLED_KEY = "noclipEnabled"
 
 local localPlayer = Players.LocalPlayer
 local stepConnection
+local characterAddedConnection
+local originalCollisionStates = {}
 
 local function getCharacter()
     return localPlayer and localPlayer.Character
+end
+
+local function rememberCollisionState(part)
+    if originalCollisionStates[part] == nil then
+        originalCollisionStates[part] = part.CanCollide
+    end
 end
 
 local function setCharacterCollision(character, canCollide)
@@ -19,9 +27,33 @@ local function setCharacterCollision(character, canCollide)
 
     for _, descendant in ipairs(character:GetDescendants()) do
         if descendant:IsA("BasePart") then
-            descendant.CanCollide = canCollide
+            if canCollide then
+                local originalState = originalCollisionStates[descendant]
+                if originalState ~= nil then
+                    descendant.CanCollide = originalState
+                    originalCollisionStates[descendant] = nil
+                else
+                    descendant.CanCollide = true
+                end
+            else
+                rememberCollisionState(descendant)
+                descendant.CanCollide = false
+            end
         end
     end
+end
+
+local function bindCharacterReset()
+    if characterAddedConnection or not localPlayer then
+        return
+    end
+
+    characterAddedConnection = localPlayer.CharacterAdded:Connect(function(character)
+        if _G.getSetting(ENABLED_KEY, false) then
+            task.wait(0.1)
+            setCharacterCollision(character, false)
+        end
+    end)
 end
 
 function Noclip:enable()
@@ -43,6 +75,7 @@ function Noclip:disable()
     end
 
     setCharacterCollision(getCharacter(), true)
+    table.clear(originalCollisionStates)
 end
 
 function Noclip:kill()
@@ -64,5 +97,7 @@ Noclip:registerToggle({
         end
     end,
 })
+
+bindCharacterReset()
 
 return Noclip

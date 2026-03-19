@@ -6,13 +6,13 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local ENABLED_KEY = "flyEnabled"
-local FLY_SPEED = 75
-local VERTICAL_SPEED = 1
+local FLY_SPEED = 60
 
 local localPlayer = Players.LocalPlayer
-local stepConnection
+local renderConnection
 local inputBeganConnection
 local inputEndedConnection
+local characterAddedConnection
 local flightController
 local activeDirections = {
     forward = false,
@@ -59,6 +59,25 @@ local function clearDirections()
     end
 end
 
+local function destroyFlightController()
+    if flightController then
+        if flightController.bodyVelocity then
+            flightController.bodyVelocity:Destroy()
+        end
+
+        if flightController.bodyGyro then
+            flightController.bodyGyro:Destroy()
+        end
+
+        if flightController.humanoid then
+            flightController.humanoid.PlatformStand = false
+            flightController.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+
+        flightController = nil
+    end
+end
+
 local function updateFlightVelocity()
     if not flightController or not flightController.rootPart then
         return
@@ -66,82 +85,51 @@ local function updateFlightVelocity()
 
     local camera = Workspace.CurrentCamera
     if not camera then
-        flightController.velocity.VectorVelocity = Vector3.zero
+        flightController.bodyVelocity.Velocity = Vector3.zero
         return
     end
 
     local moveVector = Vector3.zero
-    local flattenedLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
-    local flattenedRight = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z)
-
-    if flattenedLook.Magnitude > 0 then
-        flattenedLook = flattenedLook.Unit
-    end
-
-    if flattenedRight.Magnitude > 0 then
-        flattenedRight = flattenedRight.Unit
-    end
 
     if activeDirections.forward then
-        moveVector += flattenedLook
+        moveVector += camera.CFrame.LookVector
     end
 
     if activeDirections.backward then
-        moveVector -= flattenedLook
+        moveVector -= camera.CFrame.LookVector
     end
 
     if activeDirections.left then
-        moveVector -= flattenedRight
+        moveVector -= camera.CFrame.RightVector
     end
 
     if activeDirections.right then
-        moveVector += flattenedRight
+        moveVector += camera.CFrame.RightVector
     end
 
     if activeDirections.up then
-        moveVector += Vector3.yAxis * VERTICAL_SPEED
+        moveVector += camera.CFrame.UpVector
     end
 
     if activeDirections.down then
-        moveVector -= Vector3.yAxis * VERTICAL_SPEED
+        moveVector -= camera.CFrame.UpVector
     end
 
     if moveVector.Magnitude > 0 then
         moveVector = moveVector.Unit * FLY_SPEED
     end
 
-    flightController.velocity.VectorVelocity = moveVector
-    flightController.gyro.CFrame = camera.CFrame
+    flightController.bodyVelocity.Velocity = moveVector
+    flightController.bodyGyro.CFrame = camera.CFrame
 end
 
 local function stopFlight()
-    if stepConnection then
-        stepConnection:Disconnect()
-        stepConnection = nil
+    if renderConnection then
+        renderConnection:Disconnect()
+        renderConnection = nil
     end
 
-    if flightController then
-        local humanoid = flightController.humanoid
-        if humanoid then
-            humanoid.PlatformStand = false
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end
-
-        if flightController.attachment then
-            flightController.attachment:Destroy()
-        end
-
-        if flightController.velocity then
-            flightController.velocity:Destroy()
-        end
-
-        if flightController.gyro then
-            flightController.gyro:Destroy()
-        end
-
-        flightController = nil
-    end
-
+    destroyFlightController()
     clearDirections()
 end
 
@@ -156,43 +144,36 @@ local function startFlight()
 
     stopFlight()
 
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "FlyAttachment"
-    attachment.Parent = rootPart
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "FlyBodyVelocity"
+    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVelocity.Velocity = Vector3.zero
+    bodyVelocity.Parent = rootPart
 
-    local velocity = Instance.new("LinearVelocity")
-    velocity.Name = "FlyVelocity"
-    velocity.Attachment0 = attachment
-    velocity.RelativeTo = Enum.ActuatorRelativeTo.World
-    velocity.MaxForce = math.huge
-    velocity.VectorVelocity = Vector3.zero
-    velocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-    velocity.Parent = rootPart
-
-    local gyro = Instance.new("AlignOrientation")
-    gyro.Name = "FlyGyro"
-    gyro.Attachment0 = attachment
-    gyro.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    gyro.RigidityEnabled = true
-    gyro.Responsiveness = 200
-    gyro.CFrame = Workspace.CurrentCamera and Workspace.CurrentCamera.CFrame or rootPart.CFrame
-    gyro.Parent = rootPart
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.Name = "FlyBodyGyro"
+    bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bodyGyro.P = 1e4
+    bodyGyro.CFrame = Workspace.CurrentCamera and Workspace.CurrentCamera.CFrame or rootPart.CFrame
+    bodyGyro.Parent = rootPart
 
     humanoid.PlatformStand = true
     humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
     flightController = {
-        attachment = attachment,
-        velocity = velocity,
-        gyro = gyro,
+        bodyVelocity = bodyVelocity,
+        bodyGyro = bodyGyro,
         humanoid = humanoid,
         rootPart = rootPart,
     }
 
-    stepConnection = RunService.RenderStepped:Connect(function()
+    renderConnection = RunService.RenderStepped:Connect(function()
         local currentCharacter = getCharacter()
         if currentCharacter ~= character or not rootPart.Parent then
-            Fly:kill()
+            if _G.getSetting(ENABLED_KEY, false) then
+                task.defer(startFlight)
+            end
+            stopFlight()
             return
         end
 
@@ -231,6 +212,19 @@ local function bindMovementInput()
     end)
 end
 
+local function bindCharacterReset()
+    if characterAddedConnection or not localPlayer then
+        return
+    end
+
+    characterAddedConnection = localPlayer.CharacterAdded:Connect(function()
+        if _G.getSetting(ENABLED_KEY, false) then
+            task.wait(0.1)
+            startFlight()
+        end
+    end)
+end
+
 function Fly:enable()
     if not startFlight() then
         self:setState(ENABLED_KEY, false)
@@ -263,5 +257,6 @@ Fly:registerToggle({
 })
 
 bindMovementInput()
+bindCharacterReset()
 
 return Fly
