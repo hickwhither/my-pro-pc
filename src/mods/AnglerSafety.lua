@@ -24,8 +24,7 @@ local clearEsp
 local safeModeState = {
     active = false,
     originalCFrame = nil,
-    bodyVelocity = nil,
-    bodyGyro = nil,
+    originalAnchored = nil,
 }
 
 local function matchesAnglerEntity(instance)
@@ -153,26 +152,14 @@ local function enableSafeHeightMode()
     end
 
     safeModeState.originalCFrame = rootPart.CFrame
+    safeModeState.originalAnchored = rootPart.Anchored
     safeModeState.active = true
 
     humanoid.PlatformStand = true
-
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "AnglerSafetyVelocity"
-    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    bodyVelocity.Velocity = Vector3.zero
-    bodyVelocity.Parent = rootPart
-
-    local bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.Name = "AnglerSafetyGyro"
-    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    bodyGyro.CFrame = rootPart.CFrame
-    bodyGyro.Parent = rootPart
-
-    safeModeState.bodyVelocity = bodyVelocity
-    safeModeState.bodyGyro = bodyGyro
-
+    rootPart.Anchored = true
     rootPart.CFrame = CFrame.new(rootPart.Position.X, SAFE_HEIGHT, rootPart.Position.Z)
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    rootPart.AssemblyAngularVelocity = Vector3.zero
 end
 
 local function disableSafeHeightMode()
@@ -187,22 +174,23 @@ local function disableSafeHeightMode()
         humanoid.PlatformStand = false
     end
 
-    if safeModeState.bodyVelocity then
-        safeModeState.bodyVelocity:Destroy()
-        safeModeState.bodyVelocity = nil
-    end
+    if rootPart then
+        if safeModeState.originalCFrame then
+            rootPart.CFrame = safeModeState.originalCFrame + Vector3.new(0, 3, 0)
+        end
 
-    if safeModeState.bodyGyro then
-        safeModeState.bodyGyro:Destroy()
-        safeModeState.bodyGyro = nil
-    end
+        if safeModeState.originalAnchored ~= nil then
+            rootPart.Anchored = safeModeState.originalAnchored
+        else
+            rootPart.Anchored = false
+        end
 
-    if rootPart and safeModeState.originalCFrame then
-        rootPart.CFrame = safeModeState.originalCFrame + Vector3.new(0, 3, 0)
         rootPart.AssemblyLinearVelocity = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
     end
 
     safeModeState.originalCFrame = nil
+    safeModeState.originalAnchored = nil
 end
 
 local function refreshEntity(entity)
