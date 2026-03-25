@@ -92,12 +92,14 @@ return function(deps)
             end
 
             local isCurrency = string.find(target.Name or "", "Currency", 1, true) ~= nil
+            local isKeyCard = string.find(name, "KeyCard", 1, true)
+            local isPasswordPaper = target.name == "PasswordPaper"
             return buildTargetData(
                 target,
                 prompt,
                 ITEM_COLORS.default,
                 (target.Name or "Item"),
-                isCurrency,
+                isCurrency or isKeyCard or isPasswordPaper,
                 trackedTargets[target]
             )
         end
