@@ -196,6 +196,6 @@ _G.KeybindManager:bindInput()
 task.spawn(function()
     while true do
         syncMods(fetchSettings())
-        task.wait(0.5)
+        task.wait(0.1)
     end
 end)
