@@ -131,6 +131,8 @@ _G.getSetting = function(key, defaultValue)
     return _G.settings[key]
 end
 
+_G.fetch = fetch
+
 local loadedMods = {}
 local modModules = {
     "mods/Fullbright.lua",

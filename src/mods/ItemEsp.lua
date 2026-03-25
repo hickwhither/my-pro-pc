@@ -1,6 +1,5 @@
 local ItemEsp = _G.offlineservice("ItemEsp")
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -16,9 +15,21 @@ local ITEM_COLORS = {
     door = Color3.fromRGB(255, 255, 0),
 }
 
-local REMOTE_DISTANCE = 9999
 local AUTO_PICKUP_INTERVAL = 0.2
-local AUTO_PICKUP_DISTANCE = 10
+
+local ItemEspUtils = _G.fetch("mods/ItemEsp/utils.lua")
+local buildClassifier = _G.fetch("mods/ItemEsp/classifier.lua")
+
+if not ItemEspUtils or not buildClassifier then
+    warn("ItemEsp failed to load helper files")
+    return ItemEsp
+end
+
+local classifyTarget = buildClassifier({
+    ITEM_COLORS = ITEM_COLORS,
+    findPrompt = ItemEspUtils.findPrompt,
+    getPaperPassword = ItemEspUtils.getPaperPassword,
+})
 
 local trackedTargets = {}
 local activeVisuals = {}
@@ -35,217 +46,6 @@ local function disconnectConnections(connectionMap)
         end
         connectionMap[key] = nil
     end
-end
-
-local function getCharacterRoot()
-    local player = Players.LocalPlayer
-    local character = player and player.Character
-    return character and character:FindFirstChild("HumanoidRootPart")
-end
-
-local function getPrimaryPart(target)
-    if not target then
-        return nil
-    end
-
-    if target:IsA("BasePart") then
-        return target
-    end
-
-    if target:IsA("Model") then
-        return target.PrimaryPart
-            or target:FindFirstChild("ProxyPart", true)
-            or target:FindFirstChildWhichIsA("BasePart", true)
-    end
-
-    return nil
-end
-
-local function findPrompt(target)
-    if not target then
-        return nil
-    end
-
-    if target:IsA("ProximityPrompt") then
-        return target
-    end
-
-    return target:FindFirstChildWhichIsA("ProximityPrompt", true)
-end
-
-local function getPaperPassword(target)
-    local codePart = target and target:FindFirstChild("Code", true)
-    local surfaceGui = codePart and codePart:FindFirstChild("SurfaceGui")
-    local label = surfaceGui and surfaceGui:FindFirstChild("TextLabel")
-    local text = label and label.Text
-
-    if text and text ~= "" then
-        return text
-    end
-
-    return "????"
-end
-
-local function getRoomNumber(room)
-    if not room then
-        return nil
-    end
-
-    local lights = room:FindFirstChild("Lights")
-    if not lights then
-        return nil
-    end
-
-    local numbers = {}
-    for _, child in ipairs(lights:GetChildren()) do
-        if child.Name == "Sign" then
-            local surfaceGui = child:FindFirstChild("SurfaceGui")
-            local textLabel = surfaceGui and surfaceGui:FindFirstChild("TextLabel")
-            local number = tonumber(textLabel and textLabel.Text)
-            if number then
-                numbers[#numbers + 1] = number
-            end
-        end
-    end
-
-    if #numbers >= 2 then
-        return math.floor((numbers[1] + numbers[2]) / 2)
-    end
-
-    return numbers[1]
-end
-
-local function findRoomAncestor(instance)
-    local current = instance
-    while current and current ~= Workspace do
-        if current.Parent and current.Parent.Name == "Rooms" then
-            return current
-        end
-        current = current.Parent
-    end
-    return nil
-end
-
-local function getRoomSuffix(instance)
-    local room = findRoomAncestor(instance)
-    local roomNumber = getRoomNumber(room)
-    if roomNumber then
-        return " [P." .. tostring(roomNumber) .. "]"
-    end
-    return ""
-end
-
-local function getDoorLabel(instance)
-    local room = findRoomAncestor(instance)
-    local roomNumber = getRoomNumber(room)
-    return "Door [" .. tostring(roomNumber or "?") .. "]"
-end
-
-local function getOriginalPromptState(prompt, existingTarget)
-    if existingTarget and existingTarget.originalPromptState then
-        return existingTarget.originalPromptState
-    end
-
-    return {
-        maxActivationDistance = prompt.MaxActivationDistance,
-        requiresLineOfSight = prompt.RequiresLineOfSight,
-        holdDuration = prompt.HoldDuration,
-    }
-end
-
-local function buildTargetData(target, prompt, color, label, shouldAutoPickup, existingTarget)
-    return {
-        id = target,
-        instance = target,
-        prompt = prompt,
-        color = color,
-        label = label,
-        shouldAutoPickup = shouldAutoPickup,
-        allowRemoteUse = true,
-        originalPromptState = getOriginalPromptState(prompt, existingTarget),
-    }
-end
-
-local function classifyTarget(instance)
-    if not instance or not instance.Parent or instance:IsA("Attachment") or instance:IsA("Beam") then
-        return nil
-    end
-
-    local existingTarget = trackedTargets[instance]
-    local name = instance.Name or ""
-    local roomSuffix = getRoomSuffix(instance)
-
-    if name == "Locker" then
-        local prompt = findPrompt(instance)
-        if prompt and prompt.Enabled then
-            return buildTargetData(instance, prompt, ITEM_COLORS.locker, "Locker", false, existingTarget)
-        end
-        return nil
-    end
-
-    if name == "PasswordPaper" then
-        local prompt = findPrompt(instance)
-        if prompt and prompt.Enabled then
-            return buildTargetData(
-                instance,
-                prompt,
-                ITEM_COLORS.paper,
-                "Pass: " .. getPaperPassword(instance) .. roomSuffix,
-                true,
-                existingTarget
-            )
-        end
-        return nil
-    end
-
-    if string.find(name, "KeyCard", 1, true) then
-        local prompt = findPrompt(instance)
-        if prompt and prompt.Enabled then
-            return buildTargetData(instance, prompt, ITEM_COLORS.default, name .. roomSuffix, true, existingTarget)
-        end
-
-        local proxy = instance:FindFirstChild("ProxyPart", true)
-        prompt = findPrompt(proxy)
-        if proxy and prompt and prompt.Enabled then
-            return buildTargetData(instance, prompt, ITEM_COLORS.default, name .. roomSuffix, true, existingTarget)
-        end
-        return nil
-    end
-
-    if name == "Generator" then
-        local prompt = findPrompt(instance)
-        if prompt and prompt.Enabled then
-            return buildTargetData(instance, prompt, ITEM_COLORS.generator, "Generator" .. roomSuffix, false, existingTarget)
-        end
-        return nil
-    end
-
-    if name == "ProxyPart" then
-        local prompt = findPrompt(instance)
-        if not prompt or not prompt.Enabled then
-            return nil
-        end
-
-        local target = (instance.Parent and instance.Parent:IsA("Model")) and instance.Parent or instance
-        if target ~= instance and string.find(target.Name or "", "KeyCard", 1, true) then
-            return nil
-        end
-
-        return buildTargetData(target, prompt, ITEM_COLORS.default, (target.Name or "Item") .. roomSuffix, true, trackedTargets[target])
-    end
-
-    if instance.Parent and instance.Parent.Name == "Entrances" and (instance:IsA("Model") or instance:IsA("BasePart")) then
-        return {
-            id = instance,
-            instance = instance,
-            color = ITEM_COLORS.door,
-            label = getDoorLabel(instance),
-            shouldAutoPickup = false,
-            allowRemoteUse = false,
-        }
-    end
-
-    return nil
 end
 
 local function destroyVisual(target)
@@ -271,7 +71,7 @@ local function createVisual(targetData)
         return
     end
 
-    local adornee = getPrimaryPart(target)
+    local adornee = ItemEspUtils.getPrimaryPart(target)
     if not adornee then
         return
     end
@@ -350,7 +150,7 @@ local function applyRemotePromptState(targetData)
     local originalState = targetData.originalPromptState
     if _G.getSetting(REMOTE_USE_ENABLED_KEY, false) and targetData.allowRemoteUse then
         prompt.RequiresLineOfSight = false
-        prompt.MaxActivationDistance = REMOTE_DISTANCE
+        prompt.MaxActivationDistance = originalState.maxActivationDistance
         prompt.HoldDuration = 0
     else
         prompt.RequiresLineOfSight = originalState.requiresLineOfSight
@@ -374,27 +174,6 @@ local function forgetTarget(target)
         connection:Disconnect()
     end
     promptStateConnections[target] = nil
-end
-
-local function isPromptVisible(target)
-    local part = getPrimaryPart(target)
-    local camera = Workspace.CurrentCamera
-    if not part or not camera then
-        return false
-    end
-
-    local viewportPoint, onScreen = camera:WorldToViewportPoint(part.Position)
-    return onScreen and viewportPoint.Z > 0
-end
-
-local function isWithinAutoPickupDistance(target)
-    local root = getCharacterRoot()
-    local part = getPrimaryPart(target)
-    if not root or not part then
-        return false
-    end
-
-    return (root.Position - part.Position).Magnitude <= AUTO_PICKUP_DISTANCE
 end
 
 local function triggerPrompt(prompt)
@@ -428,7 +207,7 @@ local function attachPromptWatcher(targetData)
     promptStateConnections[targetData.id] = {
         prompt = targetData.prompt,
         connection = targetData.prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
-            local refreshed = classifyTarget(targetData.instance)
+            local refreshed = classifyTarget(targetData.instance, trackedTargets)
             if not refreshed then
                 forgetTarget(targetData.id)
                 return
@@ -443,7 +222,7 @@ local function attachPromptWatcher(targetData)
 end
 
 local function refreshTarget(instance)
-    local targetData = classifyTarget(instance)
+    local targetData = classifyTarget(instance, trackedTargets)
     if not targetData then
         return
     end
@@ -465,7 +244,7 @@ local function syncTargets()
         if not target or not target.Parent then
             forgetTarget(target)
         else
-            local refreshed = classifyTarget(targetData.instance)
+            local refreshed = classifyTarget(targetData.instance, trackedTargets)
             if refreshed then
                 trackedTargets[target] = refreshed
                 applyEspState(refreshed)
@@ -500,8 +279,8 @@ local function startAutoPickupLoop()
                 forgetTarget(target)
             elseif targetData.shouldAutoPickup
                 and targetData.prompt
-                and isWithinAutoPickupDistance(targetData.instance)
-                and isPromptVisible(targetData.instance) then
+                and ItemEspUtils.isWithinPromptDistance(targetData.instance, targetData.prompt)
+                and ItemEspUtils.isPromptVisible(targetData.instance) then
                 triggerPrompt(targetData.prompt)
             end
         end
