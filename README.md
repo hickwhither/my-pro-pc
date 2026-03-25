@@ -77,3 +77,21 @@ Example:registerToggle({
 - Create missing defaults at startup with `_G.getSetting`.
 - If your mod creates instances or connections, clean them up on disable and hard-stop them in `kill()`.
 - For panic/cleanup actions, prefer one-shot controls that safely disable existing mods.
+
+## Local settings UI
+
+`main.py` now runs a Gradio-based settings manager (mounted on FastAPI) instead of Flask.
+It still keeps compatibility endpoints for the Lua loader:
+
+- `GET /settings.lua`
+- `GET|POST /settings`
+- `GET /updateSettings`
+- `GET /src/<path>`
+
+Run with:
+
+```bash
+python main.py
+```
+
+Default URL: `http://127.0.0.1:7860`
