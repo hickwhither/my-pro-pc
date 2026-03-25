@@ -1,3 +1,5 @@
+READ USAGE IF YOU TRYING TO USE THIS
+
 # my-pro-pc
 
 A lightweight Roblox mod loader for local client-side utility mods.
