@@ -1,9 +1,13 @@
 from flask import Flask, send_from_directory, jsonify, request, send_file, Response
+from flask_socketio import SocketIO, emit
 import json
 import os
+from threading import Lock
 
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+settings_lock = Lock()
 
 
 def to_lua(value):
@@ -37,22 +41,12 @@ def settings_lua():
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     if request.method == 'GET':
-        with open('settings.json', 'r') as f:
-            data = json.load(f)
+        data = load_settings_file()
         return jsonify(data)
     elif request.method == 'POST':
         data = request.get_json()
-        with open('settings.json', 'r') as f:
-            current = json.load(f)
-        if data['action'] == 'add':
-            current[data['key']] = data['value']
-        elif data['action'] == 'remove':
-            if data['key'] in current:
-                del current[data['key']]
-        elif data['action'] == 'update':
-            current[data['key']] = data['value']
-        with open('settings.json', 'w') as f:
-            json.dump(current, f, indent=4)
+        current = apply_settings_action(data)
+        socketio.emit('settings:snapshot', current)
         return jsonify({'status': 'ok'})
 
 @app.route('/updateSettings', methods=['GET'])
@@ -63,11 +57,8 @@ def update_settings():
         value = json.loads(value_str) if value_str.startswith(('{', '[', '"')) or value_str in {'true', 'false', 'null'} or value_str.replace('.', '', 1).lstrip('-').isdigit() else value_str
     else:
         value = None
-    with open('settings.json', 'r') as f:
-        current = json.load(f)
-    current[key] = value
-    with open('settings.json', 'w') as f:
-        json.dump(current, f, indent=4)
+    current = apply_settings_action({'action': 'update', 'key': key, 'value': value})
+    socketio.emit('settings:snapshot', current)
     print(f"Updated setting {key} to {value}")
     return jsonify({'status': 'ok'})
 
@@ -75,5 +66,41 @@ def update_settings():
 def src_file(filepath):
     return send_from_directory('src', filepath)
 
+def load_settings_file():
+    with settings_lock:
+        with open('settings.json', 'r') as f:
+            return json.load(f)
+
+def save_settings_file(data):
+    with settings_lock:
+        with open('settings.json', 'w') as f:
+            json.dump(data, f, indent=4)
+
+def apply_settings_action(data):
+    current = load_settings_file()
+    action = data.get('action')
+    key = data.get('key')
+
+    if action == 'add' or action == 'update':
+        current[key] = data.get('value')
+    elif action == 'remove' and key in current:
+        del current[key]
+
+    save_settings_file(current)
+    return current
+
+@socketio.on('connect')
+def on_connect():
+    emit('settings:snapshot', load_settings_file())
+
+@socketio.on('settings:get')
+def on_settings_get():
+    emit('settings:snapshot', load_settings_file())
+
+@socketio.on('settings:command')
+def on_settings_command(payload):
+    current = apply_settings_action(payload or {})
+    socketio.emit('settings:snapshot', current)
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, debug=True)

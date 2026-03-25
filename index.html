@@ -373,6 +373,7 @@
         </section>
     </div>
 
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         function escapeHtml(value) {
             return String(value)
@@ -387,64 +388,59 @@
             return `<div class="empty-state">${message}</div>`;
         }
 
+        function renderSettings(data) {
+            const div = document.getElementById('settings');
+            const entries = Object.entries(data);
+            document.getElementById('settingsCount').textContent = entries.length;
+
+            if (!entries.length) {
+                div.innerHTML = renderEmptyState('No settings found yet. Add one from the panel on the right.');
+                return;
+            }
+
+            div.innerHTML = entries.map(([key, value]) => {
+                const type = typeof value;
+                let inputHtml = '';
+                let displayValue = value;
+
+                if (type === 'boolean') {
+                    inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${escapeHtml(key)}', this.checked, 'bool')">`;
+                    displayValue = value ? 'Enabled' : 'Disabled';
+                } else if (type === 'number') {
+                    inputHtml = `<input type="number" value="${value}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'int')">`;
+                } else {
+                    inputHtml = `<input type="text" value="${escapeHtml(value)}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'string')">`;
+                }
+
+                return `
+                    <div class="setting-card">
+                        <div>
+                            <p class="setting-key">${escapeHtml(key)}</p>
+                            <div class="meta-row">
+                                <span class="type-badge">${type}</span>
+                                <span>Current value: ${escapeHtml(displayValue)}</span>
+                            </div>
+                        </div>
+                        <div class="setting-actions">
+                            ${inputHtml}
+                            <button class="ghost-btn" onclick="removeSetting('${escapeHtml(key)}')">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         function loadSettings() {
             fetch('/settings')
                 .then(response => response.json())
-                .then(data => {
-                    const div = document.getElementById('settings');
-                    const entries = Object.entries(data);
-                    document.getElementById('settingsCount').textContent = entries.length;
-
-                    if (!entries.length) {
-                        div.innerHTML = renderEmptyState('No settings found yet. Add one from the panel on the right.');
-                        return;
-                    }
-
-                    div.innerHTML = entries.map(([key, value]) => {
-                        const type = typeof value;
-                        let inputHtml = '';
-                        let displayValue = value;
-
-                        if (type === 'boolean') {
-                            inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${escapeHtml(key)}', this.checked, 'bool')">`;
-                            displayValue = value ? 'Enabled' : 'Disabled';
-                        } else if (type === 'number') {
-                            inputHtml = `<input type="number" value="${value}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'int')">`;
-                        } else {
-                            inputHtml = `<input type="text" value="${escapeHtml(value)}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'string')">`;
-                        }
-
-                        return `
-                            <div class="setting-card">
-                                <div>
-                                    <p class="setting-key">${escapeHtml(key)}</p>
-                                    <div class="meta-row">
-                                        <span class="type-badge">${type}</span>
-                                        <span>Current value: ${escapeHtml(displayValue)}</span>
-                                    </div>
-                                </div>
-                                <div class="setting-actions">
-                                    ${inputHtml}
-                                    <button class="ghost-btn" onclick="removeSetting('${escapeHtml(key)}')">Remove</button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                });
+                .then(renderSettings);
         }
 
-        const AUTO_REFRESH_MS = 1000;
-        const LOCAL_UPDATE_GRACE_MS = 800;
-        let lastLocalUpdateAt = 0;
+        const socket = io();
 
         function updateSetting(key, value, type) {
             if (type === 'int') value = value.trim() ? parseInt(value, 10) : 0;
-            lastLocalUpdateAt = Date.now();
-            fetch('/settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'update', key, value})
-            }).then(() => loadSettings());
+            socket.emit('settings:command', {action: 'update', key, value});
         }
 
         function addSetting() {
@@ -457,23 +453,13 @@
             else if (type === 'bool') value = valueStr.trim() ? valueStr.toLowerCase() === 'true' : false;
             else value = valueStr;
 
-            fetch('/settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'add', key, value})
-            }).then(() => {
-                document.getElementById('newKey').value = '';
-                document.getElementById('newValue').value = '';
-                loadSettings();
-            });
+            socket.emit('settings:command', {action: 'add', key, value});
+            document.getElementById('newKey').value = '';
+            document.getElementById('newValue').value = '';
         }
 
         function removeSetting(key) {
-            fetch('/settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'remove', key})
-            }).then(() => loadSettings());
+            socket.emit('settings:command', {action: 'remove', key});
         }
 
         function loadExplorer() {
@@ -505,12 +491,21 @@
                 });
         }
 
+        socket.on('connect', () => {
+            document.querySelector('.pill').textContent = 'Socket Connected';
+            socket.emit('settings:get');
+        });
+
+        socket.on('disconnect', () => {
+            document.querySelector('.pill').textContent = 'Socket Disconnected';
+        });
+
+        socket.on('settings:snapshot', (data) => {
+            renderSettings(data || {});
+        });
+
         loadSettings();
         loadExplorer();
-        setInterval(() => {
-            if (Date.now() - lastLocalUpdateAt < LOCAL_UPDATE_GRACE_MS) return;
-            loadSettings();
-        }, AUTO_REFRESH_MS);
     </script>
 </body>
 </html>
