@@ -140,14 +140,26 @@ local modModules = {
     "mods/ItemEsp.lua",
 }
 
-local function syncMods(settings)
+local destroyLatched = false
+
+local function disableLoadedModsPreservingSettings()
     for _, mod in pairs(loadedMods) do
-        if mod and type(mod.kill) == "function" and settings.destroyEnabled then
+        if mod and type(mod.disable) == "function" then
+            mod:disable()
+        elseif mod and type(mod.kill) == "function" then
             mod:kill()
         end
     end
+end
+
+local function syncMods(settings)
+    if destroyLatched then
+        return
+    end
 
     if settings.destroyEnabled then
+        disableLoadedModsPreservingSettings()
+        destroyLatched = true
         _G.updateSettings("destroyEnabled", false)
         return
     end
@@ -180,12 +192,8 @@ _G.KeybindManager:registerToggle({
             return
         end
 
-        for _, mod in pairs(loadedMods) do
-            if mod and type(mod.kill) == "function" then
-                mod:kill()
-            end
-        end
-
+        disableLoadedModsPreservingSettings()
+        destroyLatched = true
         _G.updateSettings("destroyEnabled", false)
     end,
 })

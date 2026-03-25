@@ -280,6 +280,12 @@ local function stopWatcherIfUnused()
     table.clear(trackedEntities)
 end
 
+function AnglerSafety:disable()
+    clearAllEsp()
+    disableSafeHeightMode()
+    stopWatcherIfUnused()
+end
+
 function AnglerSafety:kill()
     self:setState(ESP_ENABLED_KEY, false)
     self:setState(SAFE_TP_ENABLED_KEY, false)
