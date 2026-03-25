@@ -140,6 +140,7 @@ local modModules = {
     "mods/Fly.lua",
     "mods/AnglerSafety.lua",
     "mods/ItemEsp.lua",
+    "mods/PlayerEsp.lua",
 }
 
 local destroyLatched = false
