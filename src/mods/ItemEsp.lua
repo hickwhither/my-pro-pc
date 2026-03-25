@@ -1,5 +1,6 @@
 local ItemEsp = _G.offlineservice("ItemEsp")
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -54,6 +55,10 @@ local function destroyVisual(target)
         return
     end
 
+    if visuals.clickConnection and visuals.clickConnection.Disconnect then
+        visuals.clickConnection:Disconnect()
+    end
+
     if visuals.billboard and visuals.billboard.Parent then
         visuals.billboard:Destroy()
     end
@@ -63,6 +68,22 @@ local function destroyVisual(target)
     end
 
     activeVisuals[target] = nil
+end
+
+local function teleportToTarget(target)
+    local localPlayer = Players.LocalPlayer
+    local character = localPlayer and localPlayer.Character
+    if not character then
+        return
+    end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local targetPart = ItemEspUtils.getPrimaryPart(target)
+    if not root or not targetPart then
+        return
+    end
+
+    character:PivotTo(CFrame.new(targetPart.Position + Vector3.new(0, 3, 0)))
 end
 
 local function createVisual(targetData)
@@ -83,9 +104,10 @@ local function createVisual(targetData)
     billboard.StudsOffset = Vector3.new(0, 2.3, 0)
     billboard.AlwaysOnTop = true
     billboard.ResetOnSpawn = false
+    billboard.Active = true
     billboard.Parent = target
 
-    local label = Instance.new("TextLabel")
+    local label = Instance.new("TextButton")
     label.Name = "Label"
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -98,6 +120,9 @@ local function createVisual(targetData)
     label.TextWrapped = false
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Active = true
+    label.AutoButtonColor = false
+    label.Selectable = false
     label.Parent = billboard
 
     local highlight = Instance.new("Highlight")
@@ -110,9 +135,14 @@ local function createVisual(targetData)
     highlight.OutlineTransparency = 0.5
     highlight.Parent = target
 
+    local clickConnection = label.Activated:Connect(function()
+        teleportToTarget(targetData.instance)
+    end)
+
     activeVisuals[target] = {
         billboard = billboard,
         highlight = highlight,
+        clickConnection = clickConnection,
     }
 end
 
