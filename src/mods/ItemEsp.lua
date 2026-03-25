@@ -248,6 +248,17 @@ local function classifyTarget(instance)
     return nil
 end
 
+
+local function teleportToTarget(target)
+    local root = getCharacterRoot()
+    local part = getPrimaryPart(target)
+    if not root or not part then
+        return
+    end
+
+    root.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
+end
+
 local function destroyVisual(target)
     local visuals = activeVisuals[target]
     if not visuals then
@@ -260,6 +271,10 @@ local function destroyVisual(target)
 
     if visuals.highlight and visuals.highlight.Parent then
         visuals.highlight:Destroy()
+    end
+
+    if visuals.clickConnection and visuals.clickConnection.Disconnect then
+        visuals.clickConnection:Disconnect()
     end
 
     activeVisuals[target] = nil
@@ -285,7 +300,7 @@ local function createVisual(targetData)
     billboard.ResetOnSpawn = false
     billboard.Parent = target
 
-    local label = Instance.new("TextLabel")
+    local label = Instance.new("TextButton")
     label.Name = "Label"
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -298,7 +313,12 @@ local function createVisual(targetData)
     label.TextWrapped = false
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.TextYAlignment = Enum.TextYAlignment.Center
+    label.AutoButtonColor = false
     label.Parent = billboard
+
+    local clickConnection = label.MouseButton1Click:Connect(function()
+        teleportToTarget(targetData.instance)
+    end)
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "ItemEspHighlight"
@@ -313,6 +333,7 @@ local function createVisual(targetData)
     activeVisuals[target] = {
         billboard = billboard,
         highlight = highlight,
+        clickConnection = clickConnection,
     }
 end
 
