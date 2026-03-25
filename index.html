@@ -409,9 +409,9 @@
                             inputHtml = `<input type="checkbox" ${value ? 'checked' : ''} onchange="updateSetting('${escapeHtml(key)}', this.checked, 'bool')">`;
                             displayValue = value ? 'Enabled' : 'Disabled';
                         } else if (type === 'number') {
-                            inputHtml = `<input type="number" value="${value}" oninput="updateSetting('${escapeHtml(key)}', this.value, 'int')">`;
+                            inputHtml = `<input type="number" value="${value}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'int')">`;
                         } else {
-                            inputHtml = `<input type="text" value="${escapeHtml(value)}" oninput="updateSetting('${escapeHtml(key)}', this.value, 'string')">`;
+                            inputHtml = `<input type="text" value="${escapeHtml(value)}" onchange="updateSetting('${escapeHtml(key)}', this.value, 'string')">`;
                         }
 
                         return `
@@ -433,13 +433,18 @@
                 });
         }
 
+        const AUTO_REFRESH_MS = 1000;
+        const LOCAL_UPDATE_GRACE_MS = 800;
+        let lastLocalUpdateAt = 0;
+
         function updateSetting(key, value, type) {
             if (type === 'int') value = value.trim() ? parseInt(value, 10) : 0;
+            lastLocalUpdateAt = Date.now();
             fetch('/settings', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({action: 'update', key, value})
-            });
+            }).then(() => loadSettings());
         }
 
         function addSetting() {
@@ -502,7 +507,10 @@
 
         loadSettings();
         loadExplorer();
-        setInterval(loadSettings, 100);
+        setInterval(() => {
+            if (Date.now() - lastLocalUpdateAt < LOCAL_UPDATE_GRACE_MS) return;
+            loadSettings();
+        }, AUTO_REFRESH_MS);
     </script>
 </body>
 </html>
