@@ -575,6 +575,10 @@ function ItemEsp:syncRemoteUseState()
     end
 end
 
+function ItemEsp:disable()
+    self:disableTracking()
+end
+
 function ItemEsp:kill()
     self:setState(ESP_ENABLED_KEY, false)
     self:setState(AUTO_PICKUP_ENABLED_KEY, false)
