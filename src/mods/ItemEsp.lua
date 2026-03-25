@@ -59,6 +59,14 @@ local function destroyVisual(target)
         visuals.clickConnection:Disconnect()
     end
 
+    if visuals.overlayConnection and visuals.overlayConnection.Disconnect then
+        visuals.overlayConnection:Disconnect()
+    end
+
+    if visuals.overlayGui and visuals.overlayGui.Parent then
+        visuals.overlayGui:Destroy()
+    end
+
     if visuals.billboard and visuals.billboard.Parent then
         visuals.billboard:Destroy()
     end
@@ -86,6 +94,62 @@ local function teleportToTarget(target)
     character:PivotTo(CFrame.new(targetPart.Position + Vector3.new(0, 3, 0)))
 end
 
+local function createTeleportOverlay(targetData)
+    local localPlayer = Players.LocalPlayer
+    local playerGui = localPlayer and localPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then
+        return nil, nil, nil
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ItemEspTeleportOverlay"
+    screenGui.IgnoreGuiInset = true
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+
+    local button = Instance.new("TextButton")
+    button.Name = "TeleportButton"
+    button.Size = UDim2.new(0, 90, 0, 22)
+    button.AnchorPoint = Vector2.new(0.5, 1)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.Parent = screenGui
+
+    local overlayConnection = RunService.RenderStepped:Connect(function()
+        if not _G.getSetting(ESP_ENABLED_KEY, false) or not targetData.instance or not targetData.instance.Parent then
+            screenGui.Enabled = false
+            return
+        end
+
+        local refreshedAdornee = ItemEspUtils.getPrimaryPart(targetData.instance)
+        if not refreshedAdornee then
+            screenGui.Enabled = false
+            return
+        end
+
+        local camera = Workspace.CurrentCamera
+        if not camera then
+            screenGui.Enabled = false
+            return
+        end
+
+        local position, isVisible = camera:WorldToViewportPoint(refreshedAdornee.Position + Vector3.new(0, 2.3, 0))
+        if isVisible then
+            screenGui.Enabled = true
+            button.Position = UDim2.new(0, position.X, 0, position.Y)
+        else
+            screenGui.Enabled = false
+        end
+    end)
+
+    local clickConnection = button.MouseButton1Click:Connect(function()
+        teleportToTarget(targetData.instance)
+    end)
+
+    return screenGui, overlayConnection, clickConnection
+end
+
 local function createVisual(targetData)
     local target = targetData.instance
     if activeVisuals[target] then
@@ -107,7 +171,7 @@ local function createVisual(targetData)
     billboard.Active = true
     billboard.Parent = target
 
-    local label = Instance.new("TextButton")
+    local label = Instance.new("TextLabel")
     label.Name = "Label"
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -121,8 +185,6 @@ local function createVisual(targetData)
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.TextYAlignment = Enum.TextYAlignment.Center
     label.Active = true
-    label.AutoButtonColor = false
-    label.Selectable = false
     label.Parent = billboard
 
     local highlight = Instance.new("Highlight")
@@ -135,13 +197,13 @@ local function createVisual(targetData)
     highlight.OutlineTransparency = 0.5
     highlight.Parent = target
 
-    local clickConnection = label.Activated:Connect(function()
-        teleportToTarget(targetData.instance)
-    end)
+    local overlayGui, overlayConnection, clickConnection = createTeleportOverlay(targetData)
 
     activeVisuals[target] = {
         billboard = billboard,
         highlight = highlight,
+        overlayGui = overlayGui,
+        overlayConnection = overlayConnection,
         clickConnection = clickConnection,
     }
 end
