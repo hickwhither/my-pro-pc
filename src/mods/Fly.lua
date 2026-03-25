@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 
 local ENABLED_KEY = "flyEnabled"
 local FLY_SPEED = 60
+local SWIM_FLY_SPEED = 110
 
 local localPlayer = Players.LocalPlayer
 local renderConnection
@@ -115,8 +116,13 @@ local function updateFlightVelocity()
         moveVector -= camera.CFrame.UpVector
     end
 
+    local currentSpeed = FLY_SPEED
+    if flightController.humanoid and flightController.humanoid:GetState() == Enum.HumanoidStateType.Swimming then
+        currentSpeed = SWIM_FLY_SPEED
+    end
+
     if moveVector.Magnitude > 0 then
-        moveVector = moveVector.Unit * FLY_SPEED
+        moveVector = moveVector.Unit * currentSpeed
     end
 
     flightController.bodyVelocity.Velocity = moveVector
